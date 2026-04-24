@@ -67,70 +67,103 @@ export async function getPanesInSession(
   return all.filter((p) => p.session === sessionName);
 }
 
+// 取最近偶數（最小為 2）
+function roundToEven(n: number): number {
+  if (n <= 1) return 2;
+  return n % 2 === 0 ? n : n - 1;
+}
+
+async function newWindow(sessionName: string): Promise<string> {
+  const out = await runTmux([
+    "new-window", "-t", sessionName,
+    "-P", "-F", "#{session_name}:#{window_index}.#{pane_index}",
+  ]);
+  return out.trim();
+}
+
+/**
+ * 在 session 中分配下一個 agent pane。
+ *
+ * orderedWindowTargets：當前活躍 window 中，依建立時間排序的已有 managed pane targets。
+ * 空陣列表示需要開新 window。
+ *
+ * 佈局規則（cols = roundToEven(max)/2，rows 固定 2）：
+ *   位置 n，row = floor(n/cols)，col = n%cols
+ *   row=0：水平分割前一個 top-row pane → 新增右欄
+ *   row=1：垂直分割同欄的 top-row pane → 新增下半
+ */
 export async function allocatePane(
   sessionName: string,
-  maxPanesPerWindow: number
+  maxPanesPerWindow: number,
+  orderedWindowTargets: string[]
 ): Promise<string> {
   await ensureSession(sessionName);
-  const panes = await getPanesInSession(sessionName);
 
-  if (panes.length === 0) {
-    // session 剛建立，直接使用第一個 pane
-    const out = await runTmux([
-      "list-panes",
-      "-t",
-      sessionName,
-      "-F",
-      "#{session_name}:#{window_index}.#{pane_index}",
-    ]);
-    return out.trim().split("\n")[0];
+  const n = orderedWindowTargets.length;
+
+  if (n === 0) {
+    // new-session 已自動建立 window 0, pane 0，直接用它，不另開 window
+    const sessionPanes = await getPanesInSession(sessionName);
+    if (sessionPanes.length > 0) {
+      sessionPanes.sort((a, b) =>
+        a.window_index !== b.window_index
+          ? a.window_index - b.window_index
+          : a.pane_index - b.pane_index
+      );
+      return sessionPanes[0].target;
+    }
+    // 理論上不會發生，保留 fallback
+    return newWindow(sessionName);
   }
 
-  // 統計每個 window 的 pane 數
-  const windowPaneCount: Record<number, number> = {};
-  let maxWindowIndex = 0;
-  for (const p of panes) {
-    windowPaneCount[p.window_index] = (windowPaneCount[p.window_index] ?? 0) + 1;
-    if (p.window_index > maxWindowIndex) maxWindowIndex = p.window_index;
+  // 當前 window 已滿，開新的
+  if (n >= maxPanesPerWindow) {
+    return newWindow(sessionName);
   }
 
-  const lastWindowCount = windowPaneCount[maxWindowIndex] ?? 0;
+  const cols = roundToEven(maxPanesPerWindow) / 2;
+  const row = Math.floor(n / cols);
+  const col = n % cols;
 
-  if (lastWindowCount < maxPanesPerWindow) {
-    // 在最後一個 window 分割
-    const out = await runTmux([
-      "split-window",
-      "-t",
-      `${sessionName}:${maxWindowIndex}`,
-      "-h",
-      "-P",
-      "-F",
-      "#{session_name}:#{window_index}.#{pane_index}",
-    ]);
-    return out.trim();
+  let splitTarget: string;
+  let splitDir: string;
+
+  if (row === 0) {
+    // top row：水平分割，在前一個 top-row pane 右側加新欄
+    splitTarget = orderedWindowTargets[n - 1];
+    splitDir = "-h";
   } else {
-    // 開新 window
-    const out = await runTmux([
-      "new-window",
-      "-t",
-      sessionName,
-      "-P",
-      "-F",
-      "#{session_name}:#{window_index}.#{pane_index}",
-    ]);
-    return out.trim();
+    // bottom row：垂直分割，在同欄 top-row pane 下方加下半
+    splitTarget = orderedWindowTargets[col];
+    splitDir = "-v";
   }
+
+  const out = await runTmux([
+    "split-window", "-t", splitTarget,
+    splitDir, "-P", "-F",
+    "#{session_name}:#{window_index}.#{pane_index}",
+  ]);
+  return out.trim();
 }
 
 export async function sendKeys(
   target: string,
   keys: string,
-  pressEnter: boolean = true
+  pressEnter: boolean = true,
+  literal: boolean = false
 ): Promise<void> {
-  const args = pressEnter
-    ? ["send-keys", "-t", target, keys, "Enter"]
-    : ["send-keys", "-t", target, keys];
-  await runTmux(args);
+  if (literal) {
+    // -l 逐字送出，避免特殊字元被 tmux 當作控制序列（Gemini CLI 等需要此模式）
+    await runTmux(["send-keys", "-t", target, "-l", keys]);
+    if (pressEnter) {
+      await runTmux(["send-keys", "-t", target, "Enter"]);
+    }
+  } else {
+    const args = pressEnter
+      ? ["send-keys", "-t", target, keys, "Enter"]
+      : ["send-keys", "-t", target, keys];
+    await runTmux(args);
+  }
 }
 
 export async function killPane(target: string): Promise<void> {

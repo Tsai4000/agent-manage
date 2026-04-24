@@ -12,10 +12,15 @@ const SendToAgentSchema = z.object({
     .optional()
     .default(true)
     .describe("Whether to press Enter after sending (default true)"),
+  literal: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe("Use literal mode (-l): sends each character as-is, required for Gemini CLI and other tools that use raw input mode"),
 });
 
 export async function sendToAgent(args: unknown, config: Config) {
-  const { agent_id, message, press_enter } = SendToAgentSchema.parse(args);
+  const { agent_id, message, press_enter, literal } = SendToAgentSchema.parse(args);
   const agent = await getAgent(config.registryPath, agent_id);
 
   if (!(await hasPaneAlive(agent.tmux_target))) {
@@ -24,7 +29,7 @@ export async function sendToAgent(args: unknown, config: Config) {
     );
   }
 
-  await sendKeys(agent.tmux_target, message, press_enter);
+  await sendKeys(agent.tmux_target, message, press_enter, literal);
 
   return {
     content: [

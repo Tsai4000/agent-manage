@@ -12,6 +12,7 @@ import { killAgent } from "./tools/kill-agent.js";
 import { getRegistry } from "./tools/get-registry.js";
 import { updateRegistry } from "./tools/update-registry.js";
 import { checkDependencies } from "./tools/check-dependencies.js";
+import { getPaneOutput } from "./tools/get-pane-output.js";
 
 const TOOLS = [
   {
@@ -31,6 +32,10 @@ const TOOLS = [
         press_enter: {
           type: "boolean",
           description: "傳送後是否按下 Enter（預設 true）",
+        },
+        literal: {
+          type: "boolean",
+          description: "使用 literal 模式（-l）逐字送出，Gemini CLI 等 raw input 工具必須設為 true",
         },
       },
       required: ["agent_id", "message"],
@@ -121,6 +126,22 @@ const TOOLS = [
     description: "檢查 tmux、git、node、claude、gemini、gh 等必要工具是否已安裝",
     inputSchema: { type: "object" as const, properties: {}, required: [] },
     handler: checkDependencies,
+  },
+  {
+    name: "get_pane_output",
+    description: "擷取指定 agent pane 的輸出內容（使用 tmux capture-pane）",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        agent_id: { type: "string", description: "Agent ID" },
+        lines: {
+          type: "number",
+          description: "擷取的歷史行數（預設 50）",
+        },
+      },
+      required: ["agent_id"],
+    },
+    handler: getPaneOutput,
   },
 ];
 

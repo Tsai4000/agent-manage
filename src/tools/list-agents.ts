@@ -45,12 +45,23 @@ export async function listAgents(_args: unknown, config: Config) {
   // 同步更新 status 到 registry
   await writeRegistry(config.registryPath, registry).catch(() => {});
 
+  const session = config.tmuxSession;
+
   return {
     content: [
       {
         type: "text" as const,
         text: JSON.stringify(
-          { agents, total: agents.length, running, stopped },
+          {
+            agents,
+            total: agents.length,
+            running,
+            stopped,
+            tips: {
+              view_in_iterm2: `tmux -CC attach -t ${session}`,
+              note: "tmux -CC 可在 iTerm2 中以原生視窗方式顯示每個 pane，支援滑鼠操作",
+            },
+          },
           null,
           2
         ),

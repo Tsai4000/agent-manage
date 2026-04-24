@@ -48,7 +48,32 @@ kill_agent { agent_id: "<uuid>" }
 
 ## 視窗佈局
 
-Pane 分配邏輯自動處理：
-- 每個 window 最多容納 `MAX_PANES_PER_WINDOW` 個 pane（預設 4）
-- 新 pane 以水平分割加入目前的 window
-- 當 window 已滿時，自動在同一 session 中開啟新 window
+Pane 自動以 2×(N/2) 格狀排列（N = `MAX_PANES_PER_WINDOW`，預設 4）：
+
+```
+┌─────────┬─────────┐
+│ agent 1 │ agent 2 │
+├─────────┼─────────┤
+│ agent 3 │ agent 4 │
+└─────────┴─────────┘
+```
+
+- N 為奇數時自動取最近偶數（例如 5 → 4）
+- 同一 window 填滿後，自動在同一 session 開新 window 繼續排列
+
+## 查看 Agent 視窗
+
+**iTerm2（推薦）**：使用原生 tmux 整合，每個 pane 渲染為獨立 iTerm2 視窗，支援滑鼠操作：
+
+```bash
+tmux -CC attach -t agents
+```
+
+**一般終端機**：
+
+```bash
+tmux attach -t agents
+```
+
+> `agents` 為預設 session 名稱，若有自訂 `AGENT_MANAGE_TMUX_SESSION` 請替換。
+> 呼叫 `list_agents` 時，回傳結果會自動包含對應的 attach 指令。
