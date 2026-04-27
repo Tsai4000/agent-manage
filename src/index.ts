@@ -64,9 +64,9 @@ const TOOLS = [
         },
         cli_type: {
           type: "string",
-          description: "要啟動的 CLI agent 指令（如 claude、gemini）",
+          enum: ["claude", "gemini", "copilot"],
+          description: "要啟動的 CLI agent 種類。僅支援 claude、gemini、copilot，以互動模式啟動，不可自行附加額外參數。",
         },
-        cli_args: { type: "string", description: "CLI 的額外參數" },
         session: {
           type: "string",
           description: "tmux session 名稱（覆寫設定預設值）",

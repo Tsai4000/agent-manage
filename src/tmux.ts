@@ -25,7 +25,7 @@ export async function listAllPanes(): Promise<TmuxPaneInfo[]> {
       "list-panes",
       "-a",
       "-F",
-      "#{session_name}\t#{window_index}\t#{pane_index}\t#{pane_pid}\t#{pane_current_command}\t#{window_name}",
+      "#{session_name}\t#{window_index}\t#{pane_index}\t#{pane_pid}\t#{pane_current_command}\t#{window_name}\t#{pane_id}",
     ]);
   } catch {
     return [];
@@ -36,12 +36,12 @@ export async function listAllPanes(): Promise<TmuxPaneInfo[]> {
     .split("\n")
     .filter((l) => l.length > 0)
     .map((line) => {
-      const [session, windowIndex, paneIndex, pid, currentCommand, windowName] =
+      const [session, windowIndex, paneIndex, pid, currentCommand, windowName, paneId] =
         line.split("\t");
       const wi = parseInt(windowIndex, 10);
       const pi = parseInt(paneIndex, 10);
       return {
-        target: `${session}:${wi}.${pi}`,
+        target: paneId ?? "",  // pane ID（如 %5），全域唯一且不隨 index 重排改變
         session,
         window_index: wi,
         pane_index: pi,
@@ -76,7 +76,7 @@ function roundToEven(n: number): number {
 async function newWindow(sessionName: string): Promise<string> {
   const out = await runTmux([
     "new-window", "-t", sessionName,
-    "-P", "-F", "#{session_name}:#{window_index}.#{pane_index}",
+    "-P", "-F", "#{pane_id}",
   ]);
   return out.trim();
 }
@@ -140,8 +140,7 @@ export async function allocatePane(
 
   const out = await runTmux([
     "split-window", "-t", splitTarget,
-    splitDir, "-P", "-F",
-    "#{session_name}:#{window_index}.#{pane_index}",
+    splitDir, "-P", "-F", "#{pane_id}",
   ]);
   return out.trim();
 }
@@ -175,10 +174,6 @@ export async function killPane(target: string): Promise<void> {
 }
 
 export async function hasPaneAlive(target: string): Promise<boolean> {
-  try {
-    await execFileAsync("tmux", ["list-panes", "-t", target]);
-    return true;
-  } catch {
-    return false;
-  }
+  const all = await listAllPanes().catch(() => []);
+  return all.some((p) => p.target === target);
 }

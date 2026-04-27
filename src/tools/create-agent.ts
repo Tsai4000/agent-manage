@@ -63,9 +63,8 @@ const CreateAgentSchema = z.object({
       "Avoid task/ticket numbers. If omitted, defaults to 'feature/<name>' as a fallback."
     ),
   cli_type: z
-    .string()
-    .describe("CLI agent to launch (e.g. claude, gemini, copilot)"),
-  cli_args: z.string().optional().describe("Additional CLI arguments"),
+    .enum(["claude", "gemini", "copilot"])
+    .describe("CLI agent to launch. Starts in interactive mode only; extra flags are not allowed."),
   session: z
     .string()
     .optional()
@@ -86,11 +85,7 @@ export function createAgent(args: unknown, config: Config): Promise<ToolResult> 
 
 async function doCreateAgent(args: unknown, config: Config) {
   const parsed = CreateAgentSchema.parse(args);
-  const {
-    name,
-    cli_type,
-    cli_args,
-  } = parsed;
+  const { name, cli_type } = parsed;
 
   const branch = parsed.branch ?? `feature/${name}`;
   const session = parsed.session ?? config.tmuxSession;
@@ -148,8 +143,7 @@ async function doCreateAgent(args: unknown, config: Config) {
 
   // 啟動 CLI agent
   const defaultArgs = defaultCliArgs[cli_type] ?? "";
-  const extraArgs = cli_args ?? "";
-  const cliCmd = [cli_type, defaultArgs, extraArgs].filter(Boolean).join(" ");
+  const cliCmd = [cli_type, defaultArgs].filter(Boolean).join(" ");
   await sendKeys(tmuxTarget, cliCmd, true);
 
   // 寫入 registry
