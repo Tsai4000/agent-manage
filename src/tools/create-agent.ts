@@ -57,7 +57,11 @@ const CreateAgentSchema = z.object({
   branch: z
     .string()
     .optional()
-    .describe("Git branch name (default: agent/<name>)"),
+    .describe(
+      "Git branch name. Must follow 'feature/<description>' or 'fix/<description>' convention, " +
+      "where <description> is a short kebab-case summary of the work purpose (e.g. feature/add-login-flow, fix/cart-total-overflow). " +
+      "Avoid task/ticket numbers. If omitted, defaults to 'feature/<name>' as a fallback."
+    ),
   cli_type: z
     .string()
     .describe("CLI agent to launch (e.g. claude, gemini, copilot)"),
@@ -88,7 +92,7 @@ async function doCreateAgent(args: unknown, config: Config) {
     cli_args,
   } = parsed;
 
-  const branch = parsed.branch ?? `agent/${name}`;
+  const branch = parsed.branch ?? `feature/${name}`;
   const session = parsed.session ?? config.tmuxSession;
   const worktreePath = path.join(config.worktreeRoot, name);
 

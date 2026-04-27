@@ -57,7 +57,10 @@ const TOOLS = [
         },
         branch: {
           type: "string",
-          description: "Git branch 名稱（預設：agent/<name>）",
+          description:
+            "Git branch 名稱，必須使用 'feature/<說明>' 或 'fix/<說明>' 格式，" +
+            "<說明> 為 kebab-case 的工作目的簡短描述（例：feature/add-login-flow、fix/cart-total-overflow）。" +
+            "禁止使用 task 編號或 ticket 編號命名。未提供時 fallback 為 'feature/<name>'。",
         },
         cli_type: {
           type: "string",
