@@ -149,17 +149,21 @@ export async function sendKeys(
   target: string,
   keys: string,
   pressEnter: boolean = true,
-  literal: boolean = false
+  literal: boolean = false,
+  enterDelayMs: number = 150
 ): Promise<void> {
   if (literal) {
     // -l 逐字送出，避免特殊字元被 tmux 當作控制序列（Gemini CLI 等需要此模式）
     await runTmux(["send-keys", "-t", target, "-l", keys]);
     if (pressEnter) {
+      // 等待 Ink/raw input handler 處理文字後再送 Enter，避免 Enter 在 state 更新前觸發
+      await new Promise((r) => setTimeout(r, enterDelayMs));
       await runTmux(["send-keys", "-t", target, "Enter"]);
     }
   } else {
     await runTmux(["send-keys", "-t", target, keys]);
     if (pressEnter) {
+      await new Promise((r) => setTimeout(r, enterDelayMs));
       await runTmux(["send-keys", "-t", target, "Enter"]);
     }
   }
