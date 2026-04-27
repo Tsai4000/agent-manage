@@ -146,6 +146,14 @@ async function doCreateAgent(args: unknown, config: Config) {
   const cliCmd = [cli_type, defaultArgs].filter(Boolean).join(" ");
   await sendKeys(tmuxTarget, cliCmd, true);
 
+  // 等待 CLI 完成初始化（載入 banner、設定等），避免第一次 send-to-agent 時 input handler 尚未就緒
+  const initWaitMs: Record<string, number> = {
+    claude: 5000,
+    gemini: 3000,
+    copilot: 3000,
+  };
+  await new Promise((r) => setTimeout(r, initWaitMs[cli_type] ?? 3000));
+
   // 寫入 registry
   const agentId = crypto.randomUUID();
   await setAgent(config.registryPath, agentId, {
