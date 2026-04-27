@@ -159,10 +159,10 @@ export async function sendKeys(
       await runTmux(["send-keys", "-t", target, "Enter"]);
     }
   } else {
-    const args = pressEnter
-      ? ["send-keys", "-t", target, keys, "Enter"]
-      : ["send-keys", "-t", target, keys];
-    await runTmux(args);
+    await runTmux(["send-keys", "-t", target, keys]);
+    if (pressEnter) {
+      await runTmux(["send-keys", "-t", target, "Enter"]);
+    }
   }
 }
 

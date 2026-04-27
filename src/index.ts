@@ -45,7 +45,9 @@ const TOOLS = [
   {
     name: "create_agent",
     description:
-      "建立新 git worktree、分配 tmux pane，並啟動指定 CLI agent（claude/gemini/copilot 等）",
+      "建立新 git worktree、分配 tmux pane，並啟動指定 CLI agent（claude/gemini/copilot 等）。" +
+      "⚠️ 重要：此工具會修改共享的 tmux session 與 registry，必須循序呼叫，禁止在同一輪中並發呼叫多次。" +
+      "若需建立多個 agent，請逐一等待每次呼叫完成後再發起下一次。",
     inputSchema: {
       type: "object" as const,
       properties: {

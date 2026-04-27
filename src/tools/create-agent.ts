@@ -1,7 +1,7 @@
 import { z } from "zod";
 import path from "path";
 import { readRegistry, setAgent } from "../registry.js";
-import { allocatePane, getPanesInSession, sendKeys } from "../tmux.js";
+import { allocatePane, getPanesInSession, sendKeys, hasPaneAlive } from "../tmux.js";
 import { createWorktree, removeWorktree } from "../worktree.js";
 import type { AgentRecord, Config, TmuxPaneInfo } from "../types.js";
 
@@ -116,11 +116,36 @@ async function doCreateAgent(args: unknown, config: Config) {
     throw e;
   }
 
+  // 檢查 target 是否已被 registry 占用（tmux 會在 pane 死後重用相同 index）
+  const freshRegistry = await readRegistry(config.registryPath);
+  for (const [existingId, existingAgent] of Object.entries(freshRegistry.agents)) {
+    if (existingAgent.tmux_target === tmuxTarget) {
+      await removeWorktree({ projectRoot: config.projectRoot, worktreePath }).catch(() => {});
+      const paneAlive = await hasPaneAlive(tmuxTarget);
+      throw new Error(
+        `[registry 衝突] 分配到的 pane ${tmuxTarget} 已被 registry 中的 agent '${existingAgent.name}'（id: ${existingId}）占用，` +
+        `該 pane 目前${paneAlive ? "仍存活" : "已死亡（可能是 tmux index 重用）"}。` +
+        `請通知使用者手動處理：若該 agent 已無效，可用 kill_agent 移除（agent_id: ${existingId}），` +
+        `或用 update_registry 修正 tmux_target 欄位後再重試。` +
+        `本次建立已回滾，worktree 已清除。`
+      );
+    }
+  }
+
   // cd 到 worktree
   await sendKeys(tmuxTarget, `cd ${worktreePath}`, true);
 
+  // 各 CLI 的預設安全參數：全自動模式 + 路徑限制於 worktree
+  const defaultCliArgs: Record<string, string> = {
+    claude: "--dangerously-skip-permissions",
+    gemini: "--yolo",
+    copilot: "--allow-all-tools",
+  };
+
   // 啟動 CLI agent
-  const cliCmd = cli_args ? `${cli_type} ${cli_args}` : cli_type;
+  const defaultArgs = defaultCliArgs[cli_type] ?? "";
+  const extraArgs = cli_args ?? "";
+  const cliCmd = [cli_type, defaultArgs, extraArgs].filter(Boolean).join(" ");
   await sendKeys(tmuxTarget, cliCmd, true);
 
   // 寫入 registry
